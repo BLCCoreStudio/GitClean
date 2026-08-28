@@ -100,7 +100,10 @@ pub fn scan(target: impl AsRef<Path>) -> Result<ScanReport, GitCleanError> {
     };
 
     let mut candidates = Vec::new();
-    let mut walker = WalkDir::new(&target).follow_links(false).min_depth(1).into_iter();
+    let mut walker = WalkDir::new(&target)
+        .follow_links(false)
+        .min_depth(1)
+        .into_iter();
 
     while let Some(entry_result) = walker.next() {
         let entry = match entry_result {
@@ -209,9 +212,10 @@ fn validate_target(input: &Path) -> Result<PathBuf, GitCleanError> {
         ));
     }
 
-    if canonical.components().any(
-        |component| matches!(component, Component::Normal(name) if name == std::ffi::OsStr::new(".git")),
-    ) {
+    if canonical
+        .components()
+        .any(|component| matches!(component, Component::Normal(name) if name == std::ffi::OsStr::new(".git")))
+    {
         return Err(GitCleanError::UnsafeTarget(
             "paths inside .git are forbidden".into(),
         ));
@@ -298,9 +302,7 @@ fn candidate_status(
     contains_git: bool,
 ) -> Result<CandidateStatus, GitCleanError> {
     if contains_git {
-        return Ok(CandidateStatus::Skipped(
-            "contains .git metadata".into(),
-        ));
+        return Ok(CandidateStatus::Skipped("contains .git metadata".into()));
     }
 
     let Some(git_root) = git_root else {
@@ -309,8 +311,13 @@ fn candidate_status(
         ));
     };
 
-    if tracked.iter().any(|tracked_path| tracked_path.starts_with(path)) {
-        return Ok(CandidateStatus::Skipped("contains Git-tracked files".into()));
+    if tracked
+        .iter()
+        .any(|tracked_path| tracked_path.starts_with(path))
+    {
+        return Ok(CandidateStatus::Skipped(
+            "contains Git-tracked files".into(),
+        ));
     }
 
     if kind == CandidateKind::AmbiguousGenerated && !git_ignored(git_root, path)? {
@@ -368,7 +375,11 @@ fn tracked_paths(git_root: &Path) -> Result<HashSet<PathBuf>, GitCleanError> {
     }
 
     let mut paths = HashSet::new();
-    for raw_path in output.stdout.split(|byte| *byte == 0).filter(|part| !part.is_empty()) {
+    for raw_path in output
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|part| !part.is_empty())
+    {
         let relative = path_from_git_bytes(raw_path);
         paths.insert(git_root.join(relative));
     }
@@ -387,9 +398,9 @@ fn path_from_git_bytes(bytes: &[u8]) -> PathBuf {
 }
 
 fn git_ignored(git_root: &Path, path: &Path) -> Result<bool, GitCleanError> {
-    let relative = path
-        .strip_prefix(git_root)
-        .map_err(|_| GitCleanError::GitCommand("candidate escaped the Git worktree".into()))?;
+    let relative = path.strip_prefix(git_root).map_err(|_| {
+        GitCleanError::GitCommand("candidate escaped the Git worktree".into())
+    })?;
 
     let status = Command::new("git")
         .arg("-C")
@@ -423,9 +434,11 @@ fn revalidate_before_delete(
         )));
     }
 
-    if candidate.path.components().any(
-        |component| matches!(component, Component::Normal(name) if name == std::ffi::OsStr::new(".git")),
-    ) {
+    if candidate
+        .path
+        .components()
+        .any(|component| matches!(component, Component::Normal(name) if name == std::ffi::OsStr::new(".git")))
+    {
         return Err(GitCleanError::UnsafeTarget(
             "candidate path contains .git".into(),
         ));

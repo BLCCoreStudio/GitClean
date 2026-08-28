@@ -70,7 +70,11 @@ fn run_apply(path: PathBuf) -> Result<(), gitclean::GitCleanError> {
             "Freed approximately {} across {} director{}.",
             human_bytes(report.freed_bytes),
             report.deleted.len(),
-            if report.deleted.len() == 1 { "y" } else { "ies" }
+            if report.deleted.len() == 1 {
+                "y"
+            } else {
+                "ies"
+            }
         );
     }
 
@@ -97,10 +101,16 @@ fn print_candidates(report: &gitclean::ScanReport) {
         let relative = display_relative(&report.target, &candidate.path);
         match &candidate.status {
             CandidateStatus::Safe => {
-                println!("SAFE  {:>10}  {relative}", human_bytes(candidate.size_bytes));
+                println!(
+                    "SAFE  {:>10}  {relative}",
+                    human_bytes(candidate.size_bytes)
+                );
             }
             CandidateStatus::Skipped(reason) => {
-                println!("SKIP  {:>10}  {relative} — {reason}", human_bytes(candidate.size_bytes));
+                println!(
+                    "SKIP  {:>10}  {relative} — {reason}",
+                    human_bytes(candidate.size_bytes)
+                );
             }
         }
     }
