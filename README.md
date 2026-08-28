@@ -1,8 +1,16 @@
 # GitClean
 
+**Safely find and clean generated build and cache directories.**
+
 GitClean is a small, Linux-first Rust CLI that finds generated build and cache directories in developer projects and tells you how much space they are likely using.
 
 **Dry-run is the default. GitClean never deletes anything unless you explicitly pass `--apply`.**
+
+## Status
+
+**GitClean v0.1.0 is available as the first public release.**
+
+A prebuilt Linux x86_64 archive and SHA-256 checksum are available on the [GitHub Releases page](https://github.com/BLCCoreStudio/GitClean/releases/tag/v0.1.0).
 
 ## Why
 
@@ -48,22 +56,39 @@ GitClean is intentionally conservative:
 
 GitClean reduces common cleanup mistakes, but `--apply` still deletes local untracked generated data. Review the dry-run output first.
 
-## Install from source
+## Install on Linux x86_64
+
+Download these files from the [v0.1.0 release](https://github.com/BLCCoreStudio/GitClean/releases/tag/v0.1.0):
+
+- `gitclean-v0.1.0-x86_64-unknown-linux-gnu.tar.gz`
+- `gitclean-v0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256`
+
+Verify and extract:
+
+```bash
+sha256sum -c gitclean-v0.1.0-x86_64-unknown-linux-gnu.tar.gz.sha256
+tar -xzf gitclean-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+./gitclean --version
+```
+
+You can optionally place `gitclean` somewhere on your `PATH`, such as `~/.local/bin`.
+
+## Build from source
 
 Requires stable Rust and Git.
 
 ```bash
-cargo install --path .
-```
-
-Or build a local binary:
-
-```bash
-cargo build --release
+git clone https://github.com/BLCCoreStudio/GitClean.git
+cd GitClean
+cargo build --release --locked
 ./target/release/gitclean .
 ```
 
-No release binaries are published for v0.1.0 until the project has been tested on a real machine.
+For local installation:
+
+```bash
+cargo install --path . --locked
+```
 
 ## Example
 
@@ -85,8 +110,8 @@ Before submitting a change:
 
 ```bash
 cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-features
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo test --locked --all-features
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
