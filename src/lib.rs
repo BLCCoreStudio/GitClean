@@ -398,9 +398,9 @@ fn path_from_git_bytes(bytes: &[u8]) -> PathBuf {
 }
 
 fn git_ignored(git_root: &Path, path: &Path) -> Result<bool, GitCleanError> {
-    let relative = path.strip_prefix(git_root).map_err(|_| {
-        GitCleanError::GitCommand("candidate escaped the Git worktree".into())
-    })?;
+    let relative = path
+        .strip_prefix(git_root)
+        .map_err(|_| GitCleanError::GitCommand("candidate escaped the Git worktree".into()))?;
 
     let status = Command::new("git")
         .arg("-C")
