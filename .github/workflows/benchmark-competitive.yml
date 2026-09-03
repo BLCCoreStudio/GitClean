@@ -1,0 +1,125 @@
+name: Competitive benchmark
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/benchmark-competitive.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup-discovery:
+    name: GitClean vs git clean
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install benchmark tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes hyperfine time
+
+      - name: Build GitClean
+        run: cargo build --release --locked
+
+      - name: Create labeled Git fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/gitclean-fixture
+          mkdir -p /tmp/gitclean-fixture
+          cd /tmp/gitclean-fixture
+          git init -q
+          git config user.name benchmark
+          git config user.email benchmark@example.invalid
+          cat >.gitignore <<'EOF'
+          target/
+          node_modules/
+          .pytest_cache/
+          .env
+          EOF
+          printf 'tracked\n' > README.md
+          git add README.md .gitignore
+          git commit -qm init
+          printf 'SYNTHETIC_DO_NOT_DELETE=benchmark\n' > .env
+          mkdir -p target node_modules .pytest_cache
+          for i in $(seq 1 1000); do
+            printf 'build artifact %s\n' "$i" > "target/object-$i.bin"
+            printf 'dependency %s\n' "$i" > "node_modules/pkg-$i.js"
+            printf 'cache %s\n' "$i" > ".pytest_cache/cache-$i"
+          done
+
+      - name: Verify shared discovery and safety distinction
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./target/release/gitclean /tmp/gitclean-fixture >/tmp/gitclean.out
+          git -C /tmp/gitclean-fixture clean -ndX >/tmp/git-clean.out
+          grep -q 'target' /tmp/gitclean.out
+          grep -q 'node_modules' /tmp/gitclean.out
+          grep -q 'target' /tmp/git-clean.out
+          grep -q 'node_modules' /tmp/git-clean.out
+          if grep -q '\.env' /tmp/gitclean.out; then
+            echo 'GitClean unexpectedly proposed .env as a cleanup candidate' >&2
+            exit 1
+          fi
+          grep -q '\.env' /tmp/git-clean.out
+          printf 'Both find generated directories; GitClean excludes the ignored .env fixture while git clean -ndX proposes it.\n'
+
+      - name: Benchmark dry-run cleanup discovery
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p benchmark-results
+          {
+            echo "workload=dry-run discovery in the same Git repo with 3000 generated files"
+            echo "safety_fixture=ignored .env is intentionally not a generated artifact"
+            echo "runner=ubuntu-24.04"
+            echo "kernel=$(uname -srmo)"
+            echo "cpu=$(lscpu | awk -F: '/Model name/{gsub(/^[ \t]+/,"",$2); print $2; exit}')"
+            echo "gitclean=$(./target/release/gitclean --version)"
+            echo "git=$(git --version)"
+            echo "hyperfine=$(hyperfine --version | head -n1)"
+          } > benchmark-results/environment.txt
+
+          hyperfine --warmup 3 --runs 20 \
+            --export-json benchmark-results/discovery.json \
+            --export-markdown benchmark-results/discovery.md \
+            --command-name 'GitClean' './target/release/gitclean /tmp/gitclean-fixture >/dev/null' \
+            --command-name 'git clean -ndX' 'git -C /tmp/gitclean-fixture clean -ndX >/dev/null'
+
+          /usr/bin/time -v ./target/release/gitclean /tmp/gitclean-fixture >/dev/null 2>benchmark-results/gitclean-time-v.txt
+          /usr/bin/time -v git -C /tmp/gitclean-fixture clean -ndX >/dev/null 2>benchmark-results/git-clean-time-v.txt
+          cp /tmp/gitclean.out benchmark-results/gitclean-dry-run.txt
+          cp /tmp/git-clean.out benchmark-results/git-clean-dry-run.txt
+          cat benchmark-results/discovery.md
+
+      - name: Publish summary
+        if: always()
+        run: |
+          if [[ -f benchmark-results/environment.txt ]]; then
+            echo '## Environment' >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            cat benchmark-results/environment.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -f benchmark-results/discovery.md ]]; then
+            echo '## Dry-run cleanup discovery' >> "$GITHUB_STEP_SUMMARY"
+            cat benchmark-results/discovery.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload raw evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gitclean-competitive-benchmark-${{ github.sha }}
+          path: benchmark-results/
+          if-no-files-found: error
+          retention-days: 90
