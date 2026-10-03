@@ -27,5 +27,8 @@ fn apply_preserves_candidate_containing_gitfile_metadata() {
 
     assert!(report.deleted.is_empty());
     assert!(target.exists());
-    assert_eq!(fs::read_to_string(target.join(".git")).unwrap(), "gitdir: ../somewhere\n");
+    assert_eq!(
+        fs::read_to_string(target.join(".git")).unwrap(),
+        "gitdir: ../somewhere\n"
+    );
 }
